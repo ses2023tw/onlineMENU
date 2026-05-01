@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=600, user-scalable=yes">
+    <title>洪家店牛肉麵 - 網路訂購軟體</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f6f6f6; display: flex; justify-content: center; padding: 5px 0; font-family: "Microsoft JhengHei", sans-serif; }
+        #app { background-color: white; width: 620px; padding: 15px 25px; border: 2px solid #000; min-height: 100vh; position: relative; }
+        
+        .title-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .sticky-header { position: sticky; top: 0; z-index: 50; background: white; border-bottom: 2px solid #000; padding: 5px 0 2px 0; margin-bottom: 5px; }
+        .logo-img { width: 140px; height: 140px; object-fit: contain; }
+        
+        .info-section { padding: 5px 0; border-bottom: 4px solid #000; margin-bottom: 10px; }
+        .info-input { width: 100%; border: 2px solid #000; padding: 6px; font-weight: bold; font-size: 1rem; border-radius: 4px; margin-top: 2px; }
+        .info-label { font-size: 0.85rem; font-weight: 900; color: #111; }
+
+        .menu-table { width: 100%; border-collapse: collapse; border: 2px solid black; margin-bottom: 10px; }
+        .menu-table th, .menu-table td { border: 1px solid black; padding: 4px 2px; text-align: center; vertical-align: middle; }
+        .header-main { background-color: #000; color: #fff; font-weight: bold; font-size: 18px; letter-spacing: 2px; }
+        .header-sub { background-color: #333; color: #fff; font-size: 12px; }
+        
+        .col-item-name { background-color: #fbfbfb; text-align: left; padding-left: 6px; font-weight: 900; font-size: 1.15rem; line-height: 1.2; }
+        .col-price { font-weight: bold; font-size: 1.15rem; color: #111; margin-right: 5px; }
+
+        .btn-outline { width: 30px; height: 30px; border: 1px solid #aaa; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 18px; cursor: pointer; background: white; }
+        .qty-num { font-weight: bold; font-size: 18px; min-width: 22px; color: #ccc; }
+        .has-qty { color: #e11d48; }
+
+        .cart-item { border-bottom: 1px solid #ddd; padding: 5px 0; display: flex; align-items: center; justify-content: space-between; }
+        .addon-btn { border: 1px solid #333; padding: 2px 5px; border-radius: 3px; font-size: 10px; margin-left: 2px; color: #333; white-space: nowrap; background: white; }
+        .addon-active { background-color: #000 !important; color: #fff !important; font-weight: bold; }
+
+        .summary-page { position: fixed; inset: 0; background: white; z-index: 2000; display: flex; flex-direction: column; align-items: center; overflow-y: auto; padding: 20px; }
+        [v-cloak] { display: none; }
+        .big-alert-box { background: white; padding: 40px; border: 8px solid #e11d48; border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        
+        <!-- A. 點餐主頁面 -->
+        <div v-if="!showSummary">
+            <header class="sticky-header">
+                <div class="flex items-center space-x-4 px-2">
+                    <img src="logo.png" alt="LOGO" class="logo-img" onerror="this.src='https://placehold.co/200x200?text=LOGO'">
+                    <div class="min-w-0 flex-1">
+                        <h1 class="text-2xl font-black text-red-700 title-line">洪家店牛肉麵外帶/800元可外送訂購</h1>
+                        <div v-if="isTomorrowOrder" class="bg-yellow-200 border-2 border-yellow-600 py-1 text-center font-black text-red-700 text-[14px] mt-1 mb-1 shadow-sm">
+                            現在點餐的是明天 ({{ tomorrowLabel }}) 的外帶/外送
+                        </div>
+                        <p class="text-red-600 font-bold text-[13px] leading-tight mt-1">當日9:30之後只接受電話訂餐，最早送餐時間為11:30</p>
+                        <p class="text-gray-500 font-bold text-[13px] mt-1 border-t border-gray-100 pt-0.5">{{ nowDisplay }}</p>
+                    </div>
+                </div>
+            </header>
+
+            <div id="info-section" class="info-section">
+                <div class="mb-2">
+                    <label class="info-label">滿800元，三公里內可外送 (現場取餐此欄免填)</label>
+                    <input type="text" v-model="userAddress" class="info-input" placeholder="請填寫完整外送地址">
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div><label class="info-label">聯絡人姓氏</label><input type="text" v-model="userName" class="info-input" placeholder="姓氏"></div>
+                    <div><label class="info-label">聯絡人電話</label><input type="text" v-model="userPhone" class="info-input" placeholder="電話"></div>
+                    <div><label class="info-label">自取/外送時間</label><input type="text" v-model="pickupTime" class="info-input" placeholder="12:30"></div>
+                </div>
+            </div>
+
+            <main class="pb-44">
+                <div v-for="sec in noodleCats" :key="sec.t">
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="5">{{sec.t}}</th></tr><tr class="header-sub"><th>品項</th><th>價格</th><th>拉麵</th><th>細麵</th><th>冬粉</th></tr></thead>
+                        <tbody><tr v-for="i in sec.d" :key="i.name">
+                            <td class="col-item-name">{{i.name}}</td><td class="col-price">${{i.price}}</td>
+                            <td><counter @add="add(i, '拉麵')" @sub="sub(i, '拉麵')" :val="cnt(i, '拉麵')" /></td>
+                            <td><counter @add="add(i, '細麵')" @sub="sub(i, '細麵')" :val="cnt(i, '細麵')" /></td>
+                            <td><counter @add="add(i, '冬粉')" @sub="sub(i, '冬粉')" :val="cnt(i, '冬粉')" /></td>
+                        </tr></tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-2">
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">飯類套餐</th></tr></thead>
+                        <tbody><tr v-for="i in riceCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">湯品 / 燙青菜</th></tr></thead>
+                        <tbody><tr v-for="i in soupCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-2">
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">滷菜類</th></tr></thead>
+                        <tbody><tr v-for="i in stewCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">涼拌類</th></tr></thead>
+                        <tbody><tr v-for="i in coldCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                </div>
+
+                <div class="grid grid-cols-2 gap-x-2">
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">飲料</th></tr></thead>
+                        <tbody><tr v-for="i in drinkCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                    <table class="menu-table">
+                        <thead><tr class="header-main"><th colspan="2" class="text-sm py-1">季節限定</th></tr></thead>
+                        <tbody><tr v-for="i in seasonalCat" :key="i.name"><td class="col-item-name">{{i.name}} ${{i.price}}</td><td class="w-24"><counter @add="add(i)" @sub="sub(i)" :val="cnt(i)" /></td></tr></tbody>
+                    </table>
+                </div>
+
+                <!-- 購物清單 (包含客製化按鈕) -->
+                <div v-if="cart.length > 0" class="mt-8 border-t-4 border-black pt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-black bg-black text-white px-2 py-1">您點選的餐品如下</h2>
+                        <span class="text-red-600 text-xs font-bold italic">客製化請點選</span>
+                    </div>
+                    <div v-for="item in sortedCart" :key="item.id" class="cart-item">
+                        <div class="flex-1 font-bold text-sm">{{item.name}}<span v-if="item.type" class="text-red-600 ml-1">({{item.type}})</span></div>
+                        <div class="flex flex-nowrap ml-2">
+                            <template v-if="['sn','mp','dn'].includes(item.cat)">
+                                <button @click="item.ex=!item.ex" :class="['addon-btn',item.ex?'addon-active':'']">加麵</button>
+                                <button @click="item.s1=!item.s1; if(item.s1) item.s2=false" :class="['addon-btn',item.s1?'addon-active':'']">香麻</button>
+                                <button @click="item.s2=!item.s2; if(item.s2) item.s1=false" :class="['addon-btn',item.s2?'addon-active':'']">麻辣</button>
+                                <button @click="item.msg=!item.msg" :class="['addon-btn',item.msg?'addon-active':'']">無味精</button>
+                            </template>
+                            <template v-if="item.name === '燙青菜'"><button @click="item.noGarlic=!item.noGarlic" :class="['addon-btn',item.noGarlic?'addon-active':'']">不要蒜泥</button><button @click="item.noMeat=!item.noMeat" :class="['addon-btn',item.noMeat?'addon-active':'']">不要肉燥</button></template>
+                            <template v-if="item.cat === 'rice' && !['單點排骨','白飯','火山肉燥飯'].includes(item.name)"><button @click="item.halfRice=!item.halfRice" :class="['addon-btn',item.halfRice?'addon-active':'']">半飯</button></template>
+                            <template v-if="item.cat === 'stew'">
+                                <button @click="item.noBean=!item.noBean" :class="['addon-btn',item.noBean?'addon-active':'']">不加豆瓣</button>
+                                <button @click="item.noSpicy=!item.noSpicy" :class="['addon-btn',item.noSpicy?'addon-active':'']">不辣</button>
+                            </template>
+                            <template v-if="['皮蛋豆腐','日式溏心蛋豆腐'].includes(item.name)"><button @click="item.noS=!item.noS" :class="['addon-btn',item.noS?'addon-active':'']">不醬</button><button @click="item.noF=!item.noF" :class="['addon-btn',item.noF?'addon-active':'']">不肉鬆</button></template>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <footer class="fixed bottom-0 left-1/2 -translate-x-1/2 w-[620px] bg-white border-t-2 border-black p-4 shadow-2xl flex justify-between items-center z-50">
+                <div class="w-1/3"><p class="text-3xl font-black text-red-600">$ {{ total }}</p></div>
+                <button @click="submitOrder" class="w-2/3 bg-black text-white py-5 rounded-xl font-black text-xl hover:bg-red-800 transition">確認後送出成總表</button>
+            </footer>
+        </div>
+
+        <!-- B. 訂單總表頁面 -->
+        <div v-else class="summary-page">
+            <div class="w-full max-w-[600px] text-center border-b-4 border-black pb-2 mb-4">
+                <h2 class="text-3xl font-black">訂單明細總結</h2>
+            </div>
+            <div class="flex gap-2 justify-center w-full max-w-[600px]">
+                <div class="w-[38%] bg-gray-50 border-2 border-black p-3 rounded-lg space-y-3">
+                    <div><p class="text-gray-400 font-bold text-[10px]">姓氏</p><p class="text-xl font-black">{{userName}}</p></div>
+                    <div><p class="text-gray-400 font-bold text-[10px]">電話</p><p class="text-xl font-black">{{userPhone}}</p></div>
+                    <div>
+                        <p class="text-gray-400 font-bold text-[10px]">服務時間</p>
+                        <p class="text-xl font-black text-blue-700">
+                            {{ (userAddress && total >= 800) ? '外送的時間(最早為11:30)' : '您自取的時間是：' + pickupTime }}
+                        </p>
+                    </div>
+                    <div v-if="userAddress"><p class="text-gray-400 font-bold text-[10px]">外送地址</p><p class="text-md font-black text-red-700 leading-tight">{{userAddress}}</p></div>
+                    <div class="pt-2 border-t-2 border-gray-200"><p class="text-gray-400 font-bold text-[10px]">單號</p><p class="text-lg font-black">#{{orderID}}</p></div>
+                    <div class="pt-2 border-t-2 border-gray-200"><p class="text-gray-400 font-bold text-[10px]">總額</p><p class="text-2xl font-black text-red-600">${{total}}</p></div>
+                </div>
+                <div class="w-[62%] border-2 border-black rounded-lg bg-white overflow-hidden">
+                    <table class="w-full text-[12px] text-left">
+                        <thead class="bg-black text-white"><tr><th class="p-1 px-2">序號 | 品項與客製化</th><th class="p-1 text-right px-2">金額</th></tr></thead>
+                        <tbody>
+                            <tr v-for="(item, idx) in sortedCart" :key="item.id" class="border-b border-gray-100">
+                                <td class="p-1 px-2 leading-tight">
+                                    <span class="font-bold">{{idx + 1}}. {{item.name}}</span>
+                                    <span class="text-red-600 font-bold ml-1">
+                                        {{item.type ? '('+item.type+')' : ''}} 
+                                        {{item.ex?'[加麵]':''}}{{item.s1?'[香麻]':''}}{{item.s2?'[麻辣]':''}}{{item.msg?'[無味精]':''}} 
+                                        {{item.noGarlic?'[不要蒜]':''}}{{item.noMeat?'[不要肉]':''}} 
+                                        {{item.halfRice?'[半飯]':''}}{{item.noBean?'[不加豆]':''}}{{item.noSpicy?'[不辣]':''}}
+                                        {{item.noS?'[不醬]':''}}{{item.noF?'[不肉鬆]':''}}
+                                    </span>
+                                </td>
+                                <td class="p-1 px-2 text-right font-black align-top">${{item.price + (item.ex?20:0) + (item.s1?10:0) + (item.s2?10:0)}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="mt-8 text-center pb-10">
+                <p class="text-xs text-gray-400 mb-4">請截取此畫面提供給櫃檯結帳</p>
+                <button @click="showSummary = false" class="text-black bg-gray-100 px-6 py-2 rounded-full border border-black font-bold text-xs hover:bg-gray-200 transition">返回修改內容</button>
+            </div>
+        </div>
+
+        <!-- 警告彈窗 -->
+        <div v-if="deliveryAlertShow" class="fixed inset-0 bg-black/80 flex justify-center items-center z-[4000] p-6">
+            <div class="big-alert-box">
+                <h2 class="text-6xl font-black text-red-600 mb-8 leading-tight">未滿 800 元<br>只能自取！</h2>
+                <button @click="deliveryAlertShow=false" class="bg-black text-white px-16 py-6 rounded-2xl font-black text-4xl shadow-xl hover:bg-gray-800">我知道了</button>
+            </div>
+        </div>
+
+        <div v-if="alertShow" class="fixed inset-0 bg-black/70 flex justify-center items-center z-[3000]">
+            <div class="bg-white p-10 rounded-xl text-center border-4 border-red-600 w-[85%]">
+                <p class="text-2xl font-black text-red-600 mb-4">{{ alertMsg }}</p>
+                <button @click="alertShow=false" class="bg-black text-white px-10 py-3 rounded-lg font-bold text-xl">確認</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+        const Counter = { props: ['val'], template: `<div class="flex items-center space-x-1 justify-center"><button class="btn-outline" @click="$emit('sub')">-</button><span class="qty-num" :class="val>0?'has-qty':''">{{ val }}</span><button class="btn-outline" @click="$emit('add')">+</button></div>` };
+
+        createApp({
+            components: { Counter },
+            setup() {
+                const userName = ref(''), userPhone = ref(''), pickupTime = ref(''), userAddress = ref('');
+                const showSummary = ref(false), alertShow = ref(false), deliveryAlertShow = ref(false), orderID = ref(''), cart = ref([]);
+                const nowDisplay = ref(''), isTomorrowOrder = ref(false), tomorrowLabel = ref(''), alertMsg = ref('');
+
+                const updateDateTime = () => {
+                    const now = new Date();
+                    const dayNames = ["日", "一", "二", "三", "四", "五", "六"];
+                    nowDisplay.value = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} (${dayNames[now.getDay()]}) ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+                    const totalMins = now.getHours() * 60 + now.getMinutes();
+                    if (totalMins >= 570 && totalMins <= 1230) {
+                        isTomorrowOrder.value = true;
+                        const tom = new Date(); tom.setDate(now.getDate() + 1);
+                        tomorrowLabel.value = `${tom.getMonth()+1}/${tom.getDate()} (${dayNames[tom.getDay()]})`;
+                    } else { isTomorrowOrder.value = false; }
+                };
+
+                onMounted(() => { updateDateTime(); setInterval(updateDateTime, 1000); });
+
+                const sn = [{n:'牛筋麵',p:190,c:'sn'},{n:'半筋半肉麵',p:180,c:'sn'},{n:'清燉牛肉麵',p:165,c:'sn'},{n:'紅燒牛肉麵',p:155,c:'sn'},{n:'紅燒牛肉湯麵',p:90,c:'sn'},{n:'排骨麵',p:95,c:'sn'},{n:'軟骨麵',p:105,c:'sn'},{n:'榨菜肉絲麵',p:75,c:'sn'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const mp = [{n:'肉多多紅燒牛肉麵',p:240,c:'mp'},{n:'肉多多排骨麵',p:150,c:'mp'},{n:'肉多多乾拌牛肉',p:240,c:'mp'},{n:'肉多多乾拌排骨',p:150,c:'mp'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const dn = [{n:'乾拌半肉半筋',p:180,c:'dn'},{n:'乾拌咖哩牛肉',p:160,c:'dn'},{n:'乾拌牛肉麵',p:155,c:'dn'},{n:'乾拌牛肚炸醬',p:150,c:'dn'},{n:'乾拌咖哩排骨',p:115,c:'dn'},{n:'乾拌排骨麵',p:95,c:'dn'},{n:'乾拌特製炸醬',p:85,c:'dn'},{n:'乾拌榨菜肉絲',p:75,c:'dn'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const ri = [{n:'紅燒牛肉飯',p:160,c:'rice'},{n:'咖哩牛肉飯',p:170,c:'rice'},{n:'咖哩雞肉飯',p:130,c:'rice'},{n:'咖哩排骨飯',p:125,c:'rice'},{n:'排骨飯(套餐)',p:100,c:'rice'},{n:'軟骨飯(套餐)',p:110,c:'rice'},{n:'單點排骨',p:55,c:'rice'},{n:'火山肉燥飯',p:45,c:'rice'},{n:'白飯',p:10,c:'rice'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const sp = [{n:'清燉牛肉湯',p:145,cat:'soup'},{n:'紅燒牛肉湯',p:135,cat:'soup'},{n:'牛肉湯餃',p:80,cat:'soup'},{n:'豬肉湯餃',p:80,cat:'soup'},{n:'水餃(10顆)',p:60,cat:'soup'},{n:'燙青菜',p:45,cat:'soup'},{n:'魚丸湯',p:40,cat:'soup'},{n:'餛飩湯',p:40,cat:'soup'},{n:'紫菜湯',p:20,cat:'soup'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const st = [{n:'滷牛肚',p:120,cat:'stew'},{n:'滷牛筋',p:120,cat:'stew'},{n:'滷牛腱',p:120,cat:'stew'},{n:'滷蛋',p:15,cat:'stew'},{n:'茴香花生',p:50,cat:'stew'},{n:'滷海帶',p:50,cat:'stew'},{n:'破豆干',p:50,cat:'stew'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const cd = [{n:'豬耳朵',p:50,cat:'cold'},{n:'臘味小黃瓜',p:50,cat:'cold'},{n:'涼拌雲耳',p:50,cat:'cold'},{n:'皮蛋豆腐',p:50,cat:'cold'},{n:'海帶芽',p:50,cat:'cold'},{n:'涼拌豆干絲',p:50,cat:'cold'},{n:'泡菜',p:50,cat:'cold'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const dk = [{n:'酸梅湯',p:45,cat:'drink'},{n:'冬瓜茶',p:25,cat:'drink'},{n:'可樂',p:25,cat:'drink'},{n:'雪碧',p:25,cat:'drink'},{n:'蘋果西打',p:25,cat:'drink'}].map(x=>({name:x.n,price:x.p,cat:x.c}));
+                const sc = [{name:'特調桑葚果粒氣泡水',price:50,cat:'drink'}, {name:'日式溏心蛋豆腐',price:50,cat:'cold'}, {name:'貢丸湯',price:40,cat:'soup'}];
+
+                const add = (i, t=null) => cart.value.push({...i, id:Math.random(), type:t, ex:false, s1:false, s2:false, msg:false, noGarlic:false, noMeat:false, halfRice:false, noBean:false, noSpicy:false, noS:false, noF:false});
+                const sub = (i, t=null) => { const idx = cart.value.findLastIndex(c => c.name === i.name && c.type === t); if(idx>-1) cart.value.splice(idx,1); };
+                const cnt = (i, t=null) => cart.value.filter(c => c.name === i.name && c.type === t).length;
+                const total = computed(() => cart.value.reduce((s, i) => s + i.price + (i.ex?20:0) + (i.s1?10:0) + (i.s2?10:0), 0));
+                const sortedCart = computed(() => {
+                    const order = { sn:1, mp:2, dn:3, rice:4, soup:5, stew:6, cold:7, drink:8, sc:9 };
+                    return [...cart.value].sort((a,b) => (order[a.cat]||99) - (order[b.cat]||99));
+                });
+
+                const scrollToInfo = () => document.getElementById('info-section').scrollIntoView({ behavior: 'smooth' });
+
+                const submitOrder = async () => {
+                    if(cart.value.length === 0) return alert("請先選擇餐點");
+                    
+                    // 資訊驗證邏輯
+                    if(!userName.value) { alertMsg.value = "請填入姓氏"; alertShow.value = true; scrollToInfo(); return; }
+                    if(!userPhone.value) { alertMsg.value = "請填入電話"; alertShow.value = true; scrollToInfo(); return; }
+                    if(!pickupTime.value) { alertMsg.value = "請填入時間"; alertShow.value = true; scrollToInfo(); return; }
+
+                    // 外送檢查
+                    if(total.value < 800 && userAddress.value.trim() !== '') {
+                        deliveryAlertShow.value = true;
+                        userAddress.value = ''; scrollToInfo(); return;
+                    }
+                    
+                    const date = new Date().toISOString().slice(0,10).replace(/-/g,"");
+                    let seq = Number(localStorage.getItem('h_seq')) || 0;
+                    if (localStorage.getItem('h_date') !== date) seq = 1; else seq++;
+                    localStorage.setItem('h_date', date); localStorage.setItem('h_seq', seq);
+                    orderID.value = date + String(seq).padStart(3, '0');
+
+                    const formBase = "https://docs.google.com/forms/d/e/1FAIpQLSeQsV7pyT6kL94SaSl9DI0Wyl6tMgqTq0xeMuEoM1jRMYDAwA/formResponse";
+                    const entries = { id:"entry.944884535", type:"entry.873044932", details:"entry.413698189", total:"entry.85592306", time:"entry.644654610" };
+                    const finalTimeStr = (userAddress.value && total.value >= 800) ? `外送(最早11:30)` : `自取(${pickupTime.value})`;
+                    const infoStr = `${userName.value} / ${userPhone.value} / 地址:${userAddress.value || '自取'} / 取餐:${finalTimeStr}`;
+                    const itemsStr = sortedCart.value.map((i,idx) => `${idx+1}.${i.name}${i.type?'('+i.type+')':''} [${i.ex?'加麵':''}${i.s1?'香麻':''}${i.s2?'麻辣':''}${i.msg?'無味精':''}${i.noGarlic?'不要蒜':''}${i.noMeat?'不要肉':''}${i.halfRice?'半飯':''}${i.noBean?'不加豆':''}${i.noSpicy?'不辣':''}${i.noS?'不醬':''}${i.noF?'不肉鬆':''}]`).join(", ");
+                    
+                    const url = `${formBase}?${entries.id}=${orderID.value}&${entries.type}=${encodeURIComponent(infoStr)}&${entries.details}=${encodeURIComponent(itemsStr)}&${entries.total}=${total.value}&${entries.time}=${encodeURIComponent(new Date().toLocaleString())}&submit=Submit`;
+                    fetch(url, { mode: 'no-cors' });
+                    showSummary.value = true;
+                };
+
+                return { 
+                    userName, userPhone, pickupTime, userAddress, showSummary, alertShow, deliveryAlertShow, orderID, total, add, sub, cnt, submitOrder, cart, sortedCart, nowDisplay, isTomorrowOrder, tomorrowLabel, alertMsg,
+                    noodleCats: [{t:'湯 麵 類', d:sn}, {t:'肉多多系列', d:mp}, {t:'乾 麵 類', d:dn}],
+                    riceCat: ri, soupCat: sp, stewCat: st, coldCat: cd, drinkCat: dk, seasonalCat: sc
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
